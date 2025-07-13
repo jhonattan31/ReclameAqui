@@ -1,62 +1,130 @@
 # layout.py
 
 from dash import dcc, html
-import plotly.express as px
-import plotly.graph_objects as go
 import pandas as pd
-from matplotlib.colors import ListedColormap
 
-def create_initial_scatter_plot():
-    return px.scatter(title="Selecione Município e Descritores para o Scatter Plot")
+def create_layout(lista_estados, lista_status, df):
+    """
+    Cria e retorna o layout completo do dashboard do Reclame Aqui.
+    """
+    min_data = df['ANO'].min()
+    max_data = df['ANO'].max()
+    min_texto = int(df['TAMANHO_TEXTO'].min())
+    max_texto = int(df['TAMANHO_TEXTO'].max())
 
-def create_initial_municipio_map():
-    return px.choropleth_mapbox(
-        mapbox_style="carto-positron",
-        zoom=6.5,
-        center={"lat": -5.0, "lon": -39.5},
-        title="Carregando Mapa de Desempenho por Município..."
-    )
+    layout = html.Div(className='app-container', children=[
+        
+        html.H1("Dashboard de Análise de Reclamações - Nagem", className='main-title'),
 
-def create_initial_histogram():
-    empty_df = pd.DataFrame({'dummy': []})
-    fig = px.histogram(empty_df, x='dummy', title="Selecione um Descritor e Município para o Histograma")
-    return fig
+        html.Div(className='header-section', children=[
+            html.P("Utilize os filtros abaixo para explorar os dados de reclamações da Nagem.", className='intro-text')
+        ]),
+        
+        html.Div(className='controls-container', children=[
+            html.Div(className='control-group', children=[
+                html.Label("Filtrar por Estado:", className='control-label'),
+                dcc.Dropdown(
+                    id='filtro-estado',
+                    options=[{'label': i, 'value': i} for i in lista_estados],
+                    placeholder="Todos os Estados",
+                    multi=True
+                )
+            ]),
+            html.Div(className='control-group', children=[
+                html.Label("Filtrar por Status:", className='control-label'),
+                dcc.Dropdown(
+                    id='filtro-status',
+                    options=[{'label': i, 'value': i} for i in lista_status],
+                    placeholder="Todos os Status",
+                    multi=True
+                )
+            ]),
+            html.Div(className='control-group', style={'width': '100%'}, children=[
+                html.Label("Filtrar por Data:", className='control-label'),
+                dcc.RangeSlider(
+                    id='filtro-data',
+                    min=min_data,
+                    max=max_data,
+                    value=[min_data, max_data],
+                    marks={year: str(year) for year in range(min_data, max_data + 1)},
+                    step=10,
+                    tooltip={"placement": "bottom", "always_visible": True}
+                )
+            ]),
+            html.Div(className='control-group', style={'width': '100%'}, children=[
+                html.Label("Filtrar por Tamanho do Texto (palavras):", className='control-label'),
+                dcc.RangeSlider(
+                    id='filtro-tamanho-texto',
+                    min=min_texto,
+                    max=max_texto,
+                    value=[min_texto, max_texto],
+                    marks={i: str(i) for i in range(min_texto, max_texto + 1, 500)},
+                    step=10,
+                    tooltip={"placement": "bottom", "always_visible": True}
+                )
+            ]),
+        ]),
 
-def create_initial_correlation_matrix():
-    fig = go.Figure(go.Heatmap(z=[[0,0],[0,0]], x=['Desc. A', 'Desc. B'], y=['Desc. A', 'Desc. B'], colorscale='Viridis'))
-    fig.update_layout(title_text="Carregando Matriz de Correlação...")
-    return fig
+        html.Div(className='main-content', children=[
+            html.Div(className='chart-card', children=[
+                html.H3("Reclamações ao Longo do Tempo", className='chart-title'),
+                dcc.Loading(
+                    id="loading-serie-temporal",
+                    type="circle",
+                    children=[dcc.Graph(id='grafico-serie-temporal', style={'height': '300px'})]
+                )
+            ]),
+            html.Div(className='chart-card', children=[
+                html.H3("Distribuição por Status", className='chart-title'),
+                dcc.Loading(
+                    id="loading-status",
+                    type="circle",
+                    children=[dcc.Graph(id='grafico-status', style={'height': '300px'})]
+                )
+            ]),
+            html.Div(className='chart-card', children=[
+                html.H3("Reclamações por Estado", className='chart-title'),
+                dcc.Loading(
+                    id="loading-estados",
+                    type="circle",
+                    children=[dcc.Graph(id='grafico-estados', style={'height': '300px'})]
+                )
+            ]),
+            html.Div(className='chart-card', children=[
+                html.H3("Distribuição do Tamanho do Texto", className='chart-title'),
+                dcc.Loading(
+                    id="loading-tamanho-texto",
+                    type="circle",
+                    children=[dcc.Graph(id='grafico-tamanho-texto', style={'height': '300px'})]
+                )
+            ]),
+            html.Div(className='chart-card full-width', children=[
+                html.H3("WordCloud das Reclamações", style={'textAlign': 'center'}),
+                dcc.Loading(
+                    id="loading-wordcloud",
+                    type="dot",
+                    children=[html.Img(id='wordcloud-img', style={'width': '80%', 'display': 'block', 'margin': 'auto'})]
+                )
+            ]),
+            html.Div(className='chart-card full-width', children=[
+                html.H3("Mapa de Reclamações por Estado", className='chart-title'),
+                html.Div(className='control-group', style={'maxWidth': '300px', 'marginBottom': '15px'}, children=[
+                    html.Label("Selecione o Ano:", className='control-label'),
+                    dcc.Dropdown(
+                        id='filtro-ano-mapa',
+                        options=[{'label': str(ano), 'value': ano} for ano in sorted(df['ANO'].unique())],
+                        value=df['ANO'].max()
+                    ),
+                ]),
+                dcc.Loading(
+                    id="loading-mapa",
+                    type="circle",
+                    children=[dcc.Graph(id='mapa-reclamacoes', style={'height': '65vh'})]
+                )
+            ])
+        ]),
 
-def get_layout(
-    gdf_moda_final, CORES_PARA_PADRAO, ORDEM_PADRAO_CATEGORIAS,
-    LISTA_DESCRITORES, LISTA_MUNICIPIOS_DROPDOWN_OPTIONS, LISTA_ESTATISTICAS_MAPA
-):
-    return html.Div(className='app-container', children=[
-        html.H1("Dashboard de Desempenho Educacional: Descritores SAEB - Ceará"),
-        html.Div([
-            html.Label("Selecione o Município:"),
-            dcc.Dropdown(id='dropdown-municipio-global', options=LISTA_MUNICIPIOS_DROPDOWN_OPTIONS, value='Todos')
-        ]),
-        html.Div([
-            html.H2("1. Análise de Relação entre Descritores"),
-            dcc.Dropdown(id='scatter-descritor-x', options=[{'label': d, 'value': d} for d in LISTA_DESCRITORES], value=LISTA_DESCRITORES[0]),
-            dcc.Dropdown(id='scatter-descritor-y', options=[{'label': d, 'value': d} for d in LISTA_DESCRITORES], value=LISTA_DESCRITORES[1]),
-            dcc.Graph(id='scatter-plot-descritores', figure=create_initial_scatter_plot()),
-        ]),
-        html.Div([
-            html.H2("2. Mapa de Desempenho por Município"),
-            dcc.Dropdown(id='map-descritor', options=[{'label': d, 'value': d} for d in LISTA_DESCRITORES], value=LISTA_DESCRITORES[0]),
-            dcc.Dropdown(id='map-estatistica', options=[{'label': e, 'value': e} for e in LISTA_ESTATISTICAS_MAPA], value='Média'),
-            dcc.Graph(id='municipio-map', figure=create_initial_municipio_map()),
-        ]),
-        html.Div([
-            html.H2("3. Histograma"),
-            dcc.Dropdown(id='histogram-descritor', options=[{'label': d, 'value': d} for d in LISTA_DESCRITORES], value=LISTA_DESCRITORES[0]),
-            dcc.Graph(id='histogram-plot', figure=create_initial_histogram())
-        ]),
-        html.Div([
-            html.H2("4. Matriz de Correlação"),
-            dcc.Graph(id='correlation-matrix-plot', figure=create_initial_correlation_matrix())
-        ]),
-        dcc.Store(id='filtered-data-store')
+        dcc.Store(id='dados-filtrados-store')
     ])
+    
+    return layout
