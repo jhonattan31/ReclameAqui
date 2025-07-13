@@ -3,15 +3,13 @@
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import os
 import base64
+import json
 import re
 from io import BytesIO
 from wordcloud import WordCloud
-import geopandas as gpd
 from dash.dependencies import Input, Output
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Função para gerar a WordCloud dinamicamente
 def register_callbacks(app, df):
@@ -93,7 +91,7 @@ def register_callbacks(app, df):
     @app.callback(
         Output('mapa-reclamacoes', 'figure'),
         [Input('dados-filtrados-store', 'data'),
-         Input('filtro-ano-mapa', 'value')]
+        Input('filtro-ano-mapa', 'value')]
     )
     def atualizar_mapa(dados_filtrados, ano_selecionado):
         if not dados_filtrados:
@@ -106,28 +104,24 @@ def register_callbacks(app, df):
             return go.Figure().update_layout(title_text=f"Nenhum dado para o ano de {ano_selecionado}.", template="plotly_white")
 
         reclamacoes_por_estado = dff_ano.groupby('ESTADO').size().reset_index(name='CONTAGEM')
-        
-        try:
-            FILE_PATH_Mapa = os.path.join(BASE_DIR, 'mapa_data', 'BR_UF_2022.shp')
-            mapa_base_ibge = gpd.read_file(FILE_PATH_Mapa)
-        except Exception as e:
-            return go.Figure().update_layout(title_text=f"Erro ao carregar mapa: {e}", template="plotly_white")
 
-        coluna_sigla_ibge = 'SIGLA' if 'SIGLA' in mapa_base_ibge.columns else 'SIGLA_UF'
-        
-        gdf_mapa = mapa_base_ibge.merge(reclamacoes_por_estado, left_on=coluna_sigla_ibge, right_on='ESTADO', how='left')
-        gdf_mapa['CONTAGEM'] = gdf_mapa['CONTAGEM'].fillna(0)
+        # Certifique que as siglas estejam em maiúsculas para casar com o geojson
+        reclamacoes_por_estado['ESTADO'] = reclamacoes_por_estado['ESTADO'].str.upper()
+
+        with open("mapa_data/brasil_estados.json", "r", encoding="utf-8") as f:
+            geojson = json.load(f)
 
         fig = px.choropleth_mapbox(
-            gdf_mapa,
-            geojson=gdf_mapa.geometry,
-            locations=gdf_mapa.index,
+            reclamacoes_por_estado,
+            geojson=geojson,
+            locations='ESTADO',
+            featureidkey='properties.sigla',  # corresponde à chave correta
             color='CONTAGEM',
-            color_continuous_scale="reds",
+            color_continuous_scale="Reds",
             mapbox_style="carto-positron",
-            zoom=3.2, center={"lat": -15.788497, "lon": -47.879873},
+            zoom=3.2,
+            center={"lat": -15.788497, "lon": -47.879873},
             opacity=0.6,
-            hover_name='NM_UF',
             hover_data={'CONTAGEM': True},
             labels={'CONTAGEM': 'Nº de Reclamações'}
         )
