@@ -3,13 +3,15 @@
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import json
+import os
 import base64
 import re
 from io import BytesIO
 from wordcloud import WordCloud
 import geopandas as gpd
 from dash.dependencies import Input, Output
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Função para gerar a WordCloud dinamicamente
 def register_callbacks(app, df):
@@ -106,7 +108,8 @@ def register_callbacks(app, df):
         reclamacoes_por_estado = dff_ano.groupby('ESTADO').size().reset_index(name='CONTAGEM')
         
         try:
-            mapa_base_ibge = gpd.read_file('mapa_data/BR_UF_2022.shp')
+            FILE_PATH_Mapa = os.path.join(BASE_DIR, 'mapa_data', 'BR_UF_2022.shp')
+            mapa_base_ibge = gpd.read_file(FILE_PATH_Mapa)
         except Exception as e:
             return go.Figure().update_layout(title_text=f"Erro ao carregar mapa: {e}", template="plotly_white")
 
