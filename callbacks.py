@@ -4,39 +4,14 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import json
+import base64
+import re
+from io import BytesIO
+from wordcloud import WordCloud
 import geopandas as gpd
 from dash.dependencies import Input, Output
 
 # Função para gerar a WordCloud dinamicamente
-def gerar_imagem_wordcloud(texto_filtrado):
-    from wordcloud import WordCloud
-    from nltk.corpus import stopwords
-    import io
-    import base64
-
-    stopwords_portugues = stopwords.words('portuguese')
-    novas_stopwords = [
-        "produto", "empresa", "comprei", "loja", "não", "pra", "tive", "minha", 
-        "dia", "dias", "entrega", "reclame", "aqui", "problema", "já", "pois", 
-        "outro", "outra", "Nagem", "fiz", "foi", "disse", "ainda", "ter"
-    ]
-    stopwords_portugues.extend(novas_stopwords)
-
-    if not texto_filtrado or texto_filtrado.isspace():
-        return "" 
-
-    wordcloud = WordCloud(
-        width=800, height=350, background_color='white',
-        stopwords=stopwords_portugues, colormap='viridis', max_words=100
-    ).generate(texto_filtrado)
-
-    img_buffer = io.BytesIO()
-    wordcloud.to_image().save(img_buffer, format='png')
-    img_base64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
-    
-    return f'data:image/png;base64,{img_base64}'
-
-
 def register_callbacks(app, df):
     """
     Registra todos os callbacks da aplicação.
@@ -46,14 +21,17 @@ def register_callbacks(app, df):
         Output('dados-filtrados-store', 'data'),
         [Input('filtro-estado', 'value'),
          Input('filtro-status', 'value'),
+         Input('filtro-data', 'value'),
          Input('filtro-tamanho-texto', 'value')]
     )
-    def filtrar_e_armazenar_dados(estados, status, faixa_texto):
+    def filtrar_e_armazenar_dados(estados, status, faixa_data, faixa_texto):
         dff = df.copy()
         if estados:
             dff = dff[dff['ESTADO'].isin(estados)]
         if status:
             dff = dff[dff['STATUS'].isin(status)]
+        if faixa_data:
+            dff = dff[dff['ANO'].between(faixa_data[0], faixa_data[1])]
         if faixa_texto:
             dff = dff[dff['TAMANHO_TEXTO'].between(faixa_texto[0], faixa_texto[1])]
         return dff.to_dict('records')
@@ -62,9 +40,9 @@ def register_callbacks(app, df):
     def atualizar_serie_temporal(dados):
         if not dados: return go.Figure().update_layout(title_text="Sem dados para exibir.", template="plotly_white")
         dff = pd.DataFrame(dados)
-        dff['TEMPO'] = pd.to_datetime(dff['TEMPO'])
-        reclamacoes = dff.set_index('TEMPO').resample('M').size().reset_index(name='CONTAGEM')
-        fig = px.line(reclamacoes, x='TEMPO', y='CONTAGEM', title='Volume de Reclamações ao Longo do Tempo')
+        dff['DATA'] = pd.to_datetime(dff['DATA'])
+        reclamacoes = dff.set_index('DATA').resample('ME').size().reset_index(name='CONTAGEM')
+        fig = px.line(reclamacoes, x='DATA', y='CONTAGEM', title='Volume de Reclamações ao Longo do Tempo')
         fig.update_layout(margin=dict(l=40, r=20, t=40, b=20), height=300, template="plotly_white")
         return fig
 
@@ -94,12 +72,21 @@ def register_callbacks(app, df):
         fig.update_layout(margin=dict(l=40, r=20, t=40, b=20), height=300, template="plotly_white")
         return fig
     
-    @app.callback(Output('imagem-wordcloud', 'src'), Input('dados-filtrados-store', 'data'))
-    def atualizar_wordcloud(dados):
-        if not dados: return ""
+    @app.callback(
+        Output('wordcloud-img', 'src'),
+        Input('dados-filtrados-store', 'data')
+    )
+    def update_wordcloud(dados):
+        if not dados:
+            return ''
         dff = pd.DataFrame(dados)
-        texto_filtrado = " ".join(reclamacao for reclamacao in dff.DESCRICAO.astype(str))
-        return gerar_imagem_wordcloud(texto_filtrado)
+        words = ' '.join(dff['DESCRICAO_TOKENIZADA'].dropna())
+        texto_limpo = re.sub(r"[\"\'.,;:!?()\-]", '', words)
+        wc = WordCloud(width=800, height=400, background_color='white').generate(texto_limpo)
+        buffer = BytesIO()
+        wc.to_image().save(buffer, format='PNG')
+        img_b64 = base64.b64encode(buffer.getvalue()).decode()
+        return f'data:image/png;base64,{img_b64}'
 
     @app.callback(
         Output('mapa-reclamacoes', 'figure'),

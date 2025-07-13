@@ -1,11 +1,14 @@
 # layout.py
 
 from dash import dcc, html
+import pandas as pd
 
 def create_layout(lista_estados, lista_status, df):
     """
     Cria e retorna o layout completo do dashboard do Reclame Aqui.
     """
+    min_data = df['ANO'].min()
+    max_data = df['ANO'].max()
     min_texto = int(df['TAMANHO_TEXTO'].min())
     max_texto = int(df['TAMANHO_TEXTO'].max())
 
@@ -37,13 +40,25 @@ def create_layout(lista_estados, lista_status, df):
                 )
             ]),
             html.Div(className='control-group', style={'width': '100%'}, children=[
+                html.Label("Filtrar por Data:", className='control-label'),
+                dcc.RangeSlider(
+                    id='filtro-data',
+                    min=min_data,
+                    max=max_data,
+                    value=[min_data, max_data],
+                    marks={year: str(year) for year in range(min_data, max_data + 1)},
+                    step=10,
+                    tooltip={"placement": "bottom", "always_visible": True}
+                )
+            ]),
+            html.Div(className='control-group', style={'width': '100%'}, children=[
                 html.Label("Filtrar por Tamanho do Texto (palavras):", className='control-label'),
                 dcc.RangeSlider(
                     id='filtro-tamanho-texto',
                     min=min_texto,
                     max=max_texto,
                     value=[min_texto, max_texto],
-                    marks={i: str(i) for i in range(min_texto, max_texto + 1, 200)},
+                    marks={i: str(i) for i in range(min_texto, max_texto + 1, 500)},
                     step=10,
                     tooltip={"placement": "bottom", "always_visible": True}
                 )
@@ -53,23 +68,43 @@ def create_layout(lista_estados, lista_status, df):
         html.Div(className='main-content', children=[
             html.Div(className='chart-card', children=[
                 html.H3("Reclamações ao Longo do Tempo", className='chart-title'),
-                dcc.Graph(id='grafico-serie-temporal', style={'height': '300px'})
+                dcc.Loading(
+                    id="loading-serie-temporal",
+                    type="circle",
+                    children=[dcc.Graph(id='grafico-serie-temporal', style={'height': '300px'})]
+                )
             ]),
             html.Div(className='chart-card', children=[
                 html.H3("Distribuição por Status", className='chart-title'),
-                dcc.Graph(id='grafico-status', style={'height': '300px'})
+                dcc.Loading(
+                    id="loading-status",
+                    type="circle",
+                    children=[dcc.Graph(id='grafico-status', style={'height': '300px'})]
+                )
             ]),
             html.Div(className='chart-card', children=[
                 html.H3("Reclamações por Estado", className='chart-title'),
-                dcc.Graph(id='grafico-estados', style={'height': '300px'})
+                dcc.Loading(
+                    id="loading-estados",
+                    type="circle",
+                    children=[dcc.Graph(id='grafico-estados', style={'height': '300px'})]
+                )
             ]),
             html.Div(className='chart-card', children=[
                 html.H3("Distribuição do Tamanho do Texto", className='chart-title'),
-                dcc.Graph(id='grafico-tamanho-texto', style={'height': '300px'})
+                dcc.Loading(
+                    id="loading-tamanho-texto",
+                    type="circle",
+                    children=[dcc.Graph(id='grafico-tamanho-texto', style={'height': '300px'})]
+                )
             ]),
             html.Div(className='chart-card full-width', children=[
-                html.H3("Termos Mais Frequentes nas Descrições", className='chart-title'),
-                html.Img(id='imagem-wordcloud', style={'width': '100%', 'height': 'auto', 'maxHeight': '400px'})
+                html.H3("WordCloud das Reclamações", style={'textAlign': 'center'}),
+                dcc.Loading(
+                    id="loading-wordcloud",
+                    type="dot",
+                    children=[html.Img(id='wordcloud-img', style={'width': '80%', 'display': 'block', 'margin': 'auto'})]
+                )
             ]),
             html.Div(className='chart-card full-width', children=[
                 html.H3("Mapa de Reclamações por Estado", className='chart-title'),
@@ -81,7 +116,11 @@ def create_layout(lista_estados, lista_status, df):
                         value=df['ANO'].max()
                     ),
                 ]),
-                dcc.Graph(id='mapa-reclamacoes', style={'height': '65vh'})
+                dcc.Loading(
+                    id="loading-mapa",
+                    type="circle",
+                    children=[dcc.Graph(id='mapa-reclamacoes', style={'height': '65vh'})]
+                )
             ])
         ]),
 

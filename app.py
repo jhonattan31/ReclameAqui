@@ -1,20 +1,20 @@
 # app.py
 
 from dash import Dash
-from data_processing import load_and_prepare_data
 from layout import create_layout
 from callbacks import register_callbacks
+from data_processing import FILE_PATH_Saida
+import pandas as pd
 
-# Carrega e prepara os dados
-print("Carregando e processando os dados...")
-df, imagem_wordcloud_src, lista_estados, lista_status = load_and_prepare_data()
-print("Dados carregados com sucesso!")
-
+# Leitura do dataset preprocessado
+df = pd.read_csv(FILE_PATH_Saida, parse_dates=['DATA'])
+lista_estados = sorted(df['ESTADO'].dropna().unique())
+lista_status = sorted(df['STATUS'].dropna().unique())
+# Define o layout
 # Inicializa o app
 app = Dash(__name__, assets_folder='assets')
 app.title = "Dashboard Reclame Aqui - Nagem"
 
-# Define o layout
 app.layout = create_layout(lista_estados, lista_status, df)
 
 # Registra os callbacks
